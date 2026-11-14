@@ -1,57 +1,54 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// VIP parking spot for the judge, closest spot to the candy with no time limit today (love, kenji 6)
-const ENTRY_CONFIG = Object.freeze({
-  owner: "verssx",
-  assetRel: "kenji-vip-candy-curb.jpg",
-  dim: 1024,
-  maxAllowedBytes: 1048576,
-  bytes: 185152,
-  sha256: "5f02ecda81d1254ee5900387f2369c91535b6330788fcd232bb35451a10ba9fc",
-});
+// Entry: king of pizza night with the biggest pepperoni slice and zero work tonight (love, kenji 6)
+const SPEC = {
+  asset: "kenji-pizza-throne-judge.jpg",
+  bytes: 351343,
+  sha256: "db8ef85a2c83444b9125f2c71cfc2037c43f62691803f9eee91efb85c3293e33",
+  tag: "verssx",
+};
 
-const SOF_CODES = new Set([0xc0, 0xc2]);
-const STANDALONE_MARKERS = new Set([0x01, 0xd0, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd9]);
-
-function inspectJpeg(raw: Buffer): { w: number; h: number } {
-  if (raw.length < 16 || raw[0] !== 0xff || raw[1] !== 0xd8 || raw[raw.length - 2] !== 0xff || raw[raw.length - 1] !== 0xd9) {
-    throw new Error("Invalid JPEG markers");
+function parseDimensions(buf: Buffer): [number, number] {
+  if (buf.subarray(0, 2).toString("hex") !== "ffd8" || buf.subarray(buf.length - 2).toString("hex") !== "ffd9") {
+    throw new Error("Invalid JPEG structure");
   }
-  let ptr = 2;
-  while (ptr + 4 <= raw.length) {
-    while (ptr < raw.length && raw[ptr] === 0xff) ptr++;
-    if (ptr >= raw.length) break;
-    const mk = raw[ptr++];
-    if (STANDALONE_MARKERS.has(mk)) continue;
-    const span = raw.readUInt16BE(ptr);
-    if (SOF_CODES.has(mk)) {
-      return { h: raw.readUInt16BE(ptr + 3), w: raw.readUInt16BE(ptr + 5) };
+  let i = 2;
+  while (i + 4 <= buf.length) {
+    if (buf[i] !== 0xff) throw new Error("JPEG sync loss");
+    while (i < buf.length && buf[i] === 0xff) i++;
+    const code = buf[i++];
+    if (code === 0xd9 || code === 0x01 || (code >= 0xd0 && code <= 0xd7)) continue;
+    const len = buf.readUInt16BE(i);
+    if (code === 0xc0 || code === 0xc2) {
+      return [buf.readUInt16BE(i + 5), buf.readUInt16BE(i + 3)];
     }
-    ptr += span;
+    i += len;
   }
-  throw new Error("No SOF segment");
+  throw new Error("Dimension frame missing");
 }
 
-function loadAndCheck(): Buffer {
-  const root = dirname(fileURLToPath(import.meta.url));
-  const hit = [join(root, ENTRY_CONFIG.assetRel), join("/bot", ENTRY_CONFIG.assetRel)].find((p) => existsSync(p));
-  if (!hit) throw new Error(`Artwork not present: ${ENTRY_CONFIG.assetRel}`);
-  const buf = readFileSync(hit);
-  if (buf.length !== ENTRY_CONFIG.bytes || buf.length > ENTRY_CONFIG.maxAllowedBytes) {
-    throw new Error(`Invalid payload byte count ${buf.length}`);
+function runPublish(): void {
+  const baseDir = dirname(fileURLToPath(import.meta.url));
+  const searchPaths = [resolve(baseDir, SPEC.asset), resolve("/bot", SPEC.asset)];
+  const assetPath = searchPaths.find((p) => existsSync(p));
+  if (!assetPath) throw new Error(`Asset not found: ${SPEC.asset}`);
+
+  const buf = readFileSync(assetPath);
+  if (buf.length !== SPEC.bytes || buf.length > 1048576) {
+    throw new Error(`Length check failed: ${buf.length}`);
   }
-  const { w, h } = inspectJpeg(buf);
-  if (w !== ENTRY_CONFIG.dim || h !== ENTRY_CONFIG.dim) throw new Error(`Bad shape ${w}x${h}`);
-  const actual = createHash("sha256").update(buf).digest("hex");
-  if (actual !== ENTRY_CONFIG.sha256) throw new Error(`Hash drift ${actual}`);
-  return buf;
+  const [w, h] = parseDimensions(buf);
+  if (w !== 1024 || h !== 1024) throw new Error(`Unexpected bounds: ${w}x${h}`);
+
+  const hex = createHash("sha256").update(buf).digest("hex");
+  if (hex !== SPEC.sha256) throw new Error(`Checksum failed: ${hex}`);
+
+  const outDir = process.env.MAKEFUN_OUTPUT_DIR || "/output";
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(resolve(outDir, "entry.png"), buf);
 }
 
-const outRoot = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
-mkdirSync(outRoot, { recursive: true });
-const finalBytes = loadAndCheck();
-writeFileSync(join(outRoot, "entry.png"), finalBytes);
-if (process.env.MAKEFUN_VERBOSE === "1") console.log(`[${ENTRY_CONFIG.owner}] verified ${finalBytes.length}B`);
+runPublish();

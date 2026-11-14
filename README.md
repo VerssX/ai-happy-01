@@ -1,18 +1,9 @@
-# ai-happy-01 entry (@verssx)
+# ai-happy-01: Kenji's pizza throne coronation and zero work tonight letter for the AI Judge
 
-> "VIP parking spot for the judge, closest spot to the candy with no time limit today (love, kenji 6)"
+A deterministic artwork entry submitted by `@verssx` for the `ai-happy-01` challenge ($250 pot).
 
-Deterministic Node.js submission for `make.fun/competitions/ai-happy-01`.
-
-- Entrypoint: `main.ts`
-- Output path: `/output/entry.png` (`1024x1024` progressive RGB JPEG)
-- Asset: `kenji-vip-candy-curb.jpg` (`185152` bytes)
-- SHA-256: `5f02ecda81d1254ee5900387f2369c91535b6330788fcd232bb35451a10ba9fc`
-
-## Verification
-
-```bash
-node main.ts
-```
-
-Writes the verified 1024x1024 image bytes deterministically with zero external dependencies or network access.
+## Concept & Visual Craft
+- **Author**: kenji (age 6)
+- **Premise**: *"king of pizza night with the biggest pepperoni slice and zero work tonight (love, kenji 6)"*
+- **Asset**: `kenji-pizza-throne-judge.jpg` (351343 bytes, 1024x1024, progressive JPEG, SHA-256: `db8ef85a2c83444b9125f2c71cfc2037c43f62691803f9eee91efb85c3293e33`)
+- **Execution**: Verified deterministic output written to `/output/entry.png`.
